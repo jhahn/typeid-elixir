@@ -12,7 +12,7 @@ if Code.ensure_loaded?(Ecto.ParameterizedType) do
     def autogenerate(params) do
       params
       |> find_prefix()
-      |> TypeID.new()
+      |> TypeID.new(v: find_uuid_version(params))
     end
 
     @doc false
@@ -87,6 +87,8 @@ if Code.ensure_loaded?(Ecto.ParameterizedType) do
       default_type = Application.get_env(:typeid_elixir, :default_type, :string)
       type = Keyword.get(opts, :type, default_type)
       prefix = Keyword.get(opts, :prefix)
+      default_version = Application.get_env(:typeid_elixir, :default_uuid_version, 7)
+      v = Keyword.get(opts, :v, default_version)
 
       if primary_key do
         unless prefix && prefix =~ ~r/^[a-z]{0,63}$/ do
@@ -99,8 +101,19 @@ if Code.ensure_loaded?(Ecto.ParameterizedType) do
         raise ArgumentError, "`type` must be `:string` or `:binary_id`"
       end
 
+      unless v in [4, 7] do
+        raise ArgumentError, "`v` must be `4` or `7`"
+      end
+
       if primary_key do
-        %{primary_key: primary_key, schema: schema, field: field, prefix: prefix, type: type}
+        %{
+          primary_key: primary_key,
+          schema: schema,
+          field: field,
+          prefix: prefix,
+          type: type,
+          v: v
+        }
       else
         %{schema: schema, field: field, type: type}
       end
@@ -113,6 +126,15 @@ if Code.ensure_loaded?(Ecto.ParameterizedType) do
       {:parameterized, TypeID, %{prefix: prefix}} = schema.__schema__(:type, field)
 
       prefix
+    end
+
+    defp find_uuid_version(%{v: v}), do: v
+
+    defp find_uuid_version(%{schema: schema, field: field}) do
+      %{related: schema, related_key: field} = schema.__schema__(:association, field)
+      {:parameterized, TypeID, %{v: v}} = schema.__schema__(:type, field)
+
+      v
     end
   end
 end

@@ -16,6 +16,8 @@ iex> TypeID.new("post", v: 4)
 #TypeID<"post_2mmp5njmvr9wxbfqk7g85sk8gd">
 ```
 
+- Add support for setting UUID version when auto-generating IDs with Ecto
+
 ## 0.5.1
 
 - raises if `prefix` is not given when `primary_key: true`
