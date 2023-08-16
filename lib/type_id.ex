@@ -5,14 +5,15 @@ defmodule TypeID do
   alias TypeID.UUID
 
   @enforce_keys [:prefix, :suffix]
-  defstruct @enforce_keys
+  defstruct @enforce_keys ++ [context: nil]
 
   @typedoc """
   An internal struct representing a `TypeID`.
   """
   @opaque t() :: %__MODULE__{
             prefix: String.t(),
-            suffix: String.t()
+            suffix: String.t(),
+            context: String.t() | nil
           }
 
   @seperator ?_
@@ -33,10 +34,12 @@ defmodule TypeID do
   @spec new(prefix :: String.t(), Keyword.t()) :: t()
   def new(prefix, opts \\ []) do
     suffix =
-      UUID.uuid7(opts)
+      UUID.uuid7(Keyword.take(opts, [:time]))
       |> Base32.encode()
 
-    %__MODULE__{prefix: prefix, suffix: suffix}
+    context = Keyword.get(opts, :context)
+
+    %__MODULE__{prefix: prefix, suffix: suffix, context: context}
   end
 
   @doc """
@@ -70,6 +73,21 @@ defmodule TypeID do
   end
 
   @doc """
+  Returns the context of the given `t:t/0`.
+
+  ### Example
+
+      iex> tid = TypeID.new("post", context: "review")
+      iex> TypeID.context(tid)
+      "review"
+
+  """
+  @spec context(tid :: t()) :: String.t() | nil
+  def context(%__MODULE__{context: context}) do
+    context
+  end
+
+  @doc """
   Returns an `t:iodata/0` representation of the given `t:t/0`.
 
   ### Examples
@@ -77,6 +95,11 @@ defmodule TypeID do
       iex> tid = TypeID.from_string!("player_01h4rn40ybeqws3gfp073jt81b")
       iex> TypeID.to_iodata(tid)
       ["player", ?_, "01h4rn40ybeqws3gfp073jt81b"]
+
+
+      iex> tid = TypeID.from_string!("player_01h4rn40ybeqws3gfp073jt81b_captain")
+      iex> TypeID.to_iodata(tid)
+      ["player", ?_, "01h4rn40ybeqws3gfp073jt81b", ?_, "captain"]
 
 
       iex> tid = TypeID.from_string!("01h4rn40ybeqws3gfp073jt81b")
@@ -89,8 +112,12 @@ defmodule TypeID do
     suffix
   end
 
-  def to_iodata(%__MODULE__{prefix: prefix, suffix: suffix}) do
+  def to_iodata(%__MODULE__{prefix: prefix, suffix: suffix, context: nil}) do
     [prefix, @seperator, suffix]
+  end
+
+  def to_iodata(%__MODULE__{prefix: prefix, suffix: suffix, context: context}) do
+    [prefix, @seperator, suffix, @seperator, context]
   end
 
   @doc """
@@ -154,7 +181,20 @@ defmodule TypeID do
   end
 
   @doc """
-  Parses a `t:t/0` from a prefix and suffix. 
+  Like `from/3` but raises an error if the `prefix`, `suffix`, or `context` are invalid.
+  """
+  @spec from!(prefix :: String.t(), suffix :: String.t(), context :: String.t()) ::
+          t() | no_return()
+  def from!(prefix, suffix, context) do
+    validate_prefix!(prefix)
+    validate_suffix!(suffix)
+    validate_context!(context)
+
+    %__MODULE__{prefix: prefix, suffix: suffix, context: context}
+  end
+
+  @doc """
+  Parses a `t:t/0` from a prefix and suffix.
 
   ### Example
 
@@ -171,11 +211,32 @@ defmodule TypeID do
   end
 
   @doc """
+  Parses a `t:t/0` from a prefix, suffix, and context.
+
+  ### Example
+
+      iex> {:ok, tid} = TypeID.from("invoice", "01h45ydzqkemsb9x8gq2q7vpvb", "commercial")
+      iex> tid
+      #TypeID<"invoice_01h45ydzqkemsb9x8gq2q7vpvb_commercial">
+
+  """
+  @spec from(prefix :: String.t(), suffix :: String.t(), context :: String.t()) ::
+          {:ok, t()} | :error
+  def from(prefix, suffix, context) do
+    {:ok, from!(prefix, suffix, context)}
+  rescue
+    ArgumentError -> :error
+  end
+
+  @doc """
   Like `from_string/1` but raises an error if the string is invalid.
   """
   @spec from_string!(String.t()) :: t() | no_return()
   def from_string!(str) do
     case String.split(str, <<@seperator>>) do
+      [prefix, suffix, context] when prefix != "" ->
+        from!(prefix, suffix, context)
+
       [prefix, suffix] when prefix != "" ->
         from!(prefix, suffix)
 
@@ -214,6 +275,16 @@ defmodule TypeID do
   end
 
   @doc """
+  Like `from_uuid/3` but raises an error if the `prefix`, `uuid`, or `context` are invalid.
+  """
+  @spec from_uuid!(prefix :: String.t(), uuid :: String.t(), context :: String.t()) ::
+          t() | no_return()
+  def from_uuid!(prefix, uuid, context) do
+    uuid_bytes = UUID.string_to_binary(uuid)
+    from_uuid_bytes!(prefix, uuid_bytes, context)
+  end
+
+  @doc """
   Parses a `t:t/0` from a prefix and a string representation of a uuid.
 
   ### Example
@@ -231,6 +302,24 @@ defmodule TypeID do
   end
 
   @doc """
+  Parses a `t:t/0` from a prefix, a string representation of a uuid, and a context.
+
+  ### Example
+
+      iex> {:ok, tid} = TypeID.from_uuid("device", "01890be9-b248-777e-964e-af1d244f997d", "loaner")
+      iex> tid
+      #TypeID<"device_01h45ykcj8exz9cknf3mj4z6bx_loaner">
+
+  """
+  @spec from_uuid(prefix :: String.t(), uuid :: String.t(), context :: String.t()) ::
+          {:ok, t()} | :error
+  def from_uuid(prefix, uuid, context) do
+    {:ok, from_uuid!(prefix, uuid, context)}
+  rescue
+    ArgumentError -> :error
+  end
+
+  @doc """
   Like `from_uuid_bytes/2` but raises an error if the `prefix` or `uuid_bytes`
   are invalid.
   """
@@ -238,6 +327,17 @@ defmodule TypeID do
   def from_uuid_bytes!(prefix, <<uuid_bytes::binary-size(16)>>) do
     suffix = Base32.encode(uuid_bytes)
     from!(prefix, suffix)
+  end
+
+  @doc """
+  Like `from_uuid_bytes/3` but raises an error if the `prefix`, `uuid_bytes`, or `context`
+  are invalid.
+  """
+  @spec from_uuid_bytes!(prefix :: String.t(), uuid_bytes :: binary(), context :: String.t()) ::
+          t() | no_return()
+  def from_uuid_bytes!(prefix, <<uuid_bytes::binary-size(16)>>, context) do
+    suffix = Base32.encode(uuid_bytes)
+    from!(prefix, suffix, context)
   end
 
   @doc """
@@ -257,6 +357,24 @@ defmodule TypeID do
     ArgumentError -> :error
   end
 
+  @doc """
+  Parses a `t:t/0` from a prefix, a raw binary uuid, and a context.
+
+  ### Example
+
+      iex> {:ok, tid} = TypeID.from_uuid_bytes("policy", <<1, 137, 11, 235, 83, 221, 116, 212, 161, 42, 205, 139, 182, 243, 175, 110>>, "internal")
+      iex> tid
+      #TypeID<"policy_01h45ypmyxekaa2apdhevf7bve_internal">
+
+  """
+  @spec from_uuid_bytes(prefix :: String.t(), uuid_bytes :: binary(), context :: String.t()) ::
+          {:ok, t()} | :error
+  def from_uuid_bytes(prefix, uuid_bytes, context) do
+    {:ok, from_uuid_bytes!(prefix, uuid_bytes, context)}
+  rescue
+    ArgumentError -> :error
+  end
+
   defp validate_prefix!(prefix) do
     unless prefix =~ ~r/^[a-z]{0,63}$/ do
       raise ArgumentError, "invalid prefix: #{prefix}. prefix should match [a-z]{0,63}"
@@ -267,6 +385,14 @@ defmodule TypeID do
 
   defp validate_suffix!(suffix) do
     Base32.decode!(suffix)
+
+    :ok
+  end
+
+  defp validate_context!(context) do
+    unless context =~ ~r/^[a-z]{0,63}$/ do
+      raise ArgumentError, "invalid context: #{context}. context should match [a-z]{0,63}"
+    end
 
     :ok
   end

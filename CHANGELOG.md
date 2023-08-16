@@ -1,5 +1,14 @@
 # Changelog
 
+## HEAD
+
+- Add support for context
+
+```elixir
+iex> TypeID.new("post", context: "review")
+#TypeID<"post_01h803dveze5e8cgmb5ejkj3a0_review">
+```
+
 ## 0.5.1
 
 - raises if `prefix` is not given when `primary_key: true`
