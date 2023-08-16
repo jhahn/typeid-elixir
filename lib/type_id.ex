@@ -34,8 +34,15 @@ defmodule TypeID do
   @spec new(prefix :: String.t(), Keyword.t()) :: t()
   def new(prefix, opts \\ []) do
     suffix =
-      UUID.uuid7(Keyword.take(opts, [:time]))
-      |> Base32.encode()
+      case Keyword.get(opts, :v) do
+        4 ->
+          UUID.uuid4()
+          |> Base32.encode()
+
+        _ ->
+          UUID.uuid7(Keyword.take(opts, [:time]))
+          |> Base32.encode()
+      end
 
     context = Keyword.get(opts, :context)
 

@@ -9,6 +9,13 @@ iex> TypeID.new("post", context: "review")
 #TypeID<"post_01h803dveze5e8cgmb5ejkj3a0_review">
 ```
 
+- Add support for setting UUID version
+
+```elixir
+iex> TypeID.new("post", v: 4)
+#TypeID<"post_2mmp5njmvr9wxbfqk7g85sk8gd">
+```
+
 ## 0.5.1
 
 - raises if `prefix` is not given when `primary_key: true`

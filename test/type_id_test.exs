@@ -17,6 +17,20 @@ defmodule TypeIDTest do
       assert "test" == TypeID.prefix(tid)
       assert "7zegbdn300" <> _ = TypeID.suffix(tid)
     end
+
+    test "allows setting the UUID version to 4" do
+      tid = TypeID.new("test", v: 4)
+      assert "test" == TypeID.prefix(tid)
+      assert <<_u0::48, 4::4, _u1::12, 2::2, _u2::62>> = TypeID.uuid_bytes(tid)
+    end
+
+    test "allows setting the UUID version to 7" do
+      tid = TypeID.new("test", v: 7)
+      assert "test" == TypeID.prefix(tid)
+
+      assert <<_time::big-unsigned-integer-size(48), 7::4, _rand_a::12, 2::2, _rand_b::62>> =
+               TypeID.uuid_bytes(tid)
+    end
   end
 
   describe "prefix/1" do
