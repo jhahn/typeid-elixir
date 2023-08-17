@@ -100,7 +100,7 @@ if Code.ensure_loaded?(Ecto.ParameterizedType) do
                 "must specify `prefix` using only lowercase letters between 0 and 63 characters long."
         end
 
-        unless context && context =~ ~r/^[a-z]{0,63}$/ do
+        if context && not (context =~ ~r/^[a-z]{0,63}$/) do
           raise ArgumentError,
                 "must specify `context` using only lowercase letters between 0 and 63 characters long."
         end
