@@ -17,6 +17,7 @@ iex> TypeID.new("post", v: 4)
 ```
 
 - Add support for setting UUID version when auto-generating IDs with Ecto
+- Add support for setting context when auto-generating IDs with Ecto
 
 ## 0.5.1
 

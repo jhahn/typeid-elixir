@@ -10,9 +10,12 @@ if Code.ensure_loaded?(Ecto.ParameterizedType) do
 
     @doc false
     def autogenerate(params) do
+      context = find_context(params)
+      v = find_uuid_version(params)
+
       params
       |> find_prefix()
-      |> TypeID.new(v: find_uuid_version(params))
+      |> TypeID.new(v: v, context: context)
     end
 
     @doc false
@@ -87,6 +90,7 @@ if Code.ensure_loaded?(Ecto.ParameterizedType) do
       default_type = Application.get_env(:typeid_elixir, :default_type, :string)
       type = Keyword.get(opts, :type, default_type)
       prefix = Keyword.get(opts, :prefix)
+      context = Keyword.get(opts, :context)
       default_version = Application.get_env(:typeid_elixir, :default_uuid_version, 7)
       v = Keyword.get(opts, :v, default_version)
 
@@ -94,6 +98,11 @@ if Code.ensure_loaded?(Ecto.ParameterizedType) do
         unless prefix && prefix =~ ~r/^[a-z]{0,63}$/ do
           raise ArgumentError,
                 "must specify `prefix` using only lowercase letters between 0 and 63 characters long."
+        end
+
+        unless context && context =~ ~r/^[a-z]{0,63}$/ do
+          raise ArgumentError,
+                "must specify `context` using only lowercase letters between 0 and 63 characters long."
         end
       end
 
@@ -112,7 +121,8 @@ if Code.ensure_loaded?(Ecto.ParameterizedType) do
           field: field,
           prefix: prefix,
           type: type,
-          v: v
+          v: v,
+          context: context
         }
       else
         %{schema: schema, field: field, type: type}
@@ -135,6 +145,15 @@ if Code.ensure_loaded?(Ecto.ParameterizedType) do
       {:parameterized, TypeID, %{v: v}} = schema.__schema__(:type, field)
 
       v
+    end
+
+    defp find_context(%{context: context}), do: context
+
+    defp find_context(%{schema: schema, field: field}) do
+      %{related: schema, related_key: field} = schema.__schema__(:association, field)
+      {:parameterized, TypeID, %{context: context}} = schema.__schema__(:type, field)
+
+      context
     end
   end
 end
